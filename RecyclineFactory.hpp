@@ -3,7 +3,7 @@
 
 
 /**
- * 可回收产品的工厂类 v0.1
+ * 可回收产品的工厂类 v0.11
  * 1. 重复利用产品
  * 2. 仅支持单一产品
  *
@@ -49,6 +49,18 @@ class ProductContainer
 public:
 	ProductContainer(const ProductName& name) : __sName(name) { __pType = new ProductType; }
 	~ProductContainer(void) { delete __pType; }
+	ProductContainer(const ProductContainer< ProductType, ProductName >& product)
+	{
+        this->__sName = product.__sName;
+        this->__pType = new ProductType;
+        *this->__pType = *product.__pType;
+	}
+	ProductContainer< ProductType, ProductName >& operator=(const ProductContainer< ProductType, ProductName >& product)
+	{
+        this->__sName = product.__sName;
+        this->__pType = new ProductType;
+        *this->__pType = *product->__pType;
+	}
 	const ProductName& GetName(void) const { return __sName; }
 	ProductType* GetProduct(void) const { return __pType; }
 
@@ -76,7 +88,32 @@ public:
 		return ProduceIdle(m_iter->second);
 	}
 
-	void Recycling(TheProduct* product)
+	void Duplicate(const TheProduct* product, const size_t count = 1)
+	{
+		typename std::map< ProductName, std::list< TheProduct* > >::iterator m_iter;
+
+		assert(IsValidProduct(product));
+        for (size_t i = 0; i < count; ++i)
+		{
+			TheProduct* p = new TheProduct(*product);
+			p->GetProduct()->Recycling();
+			m_lIdleList.push_back(p);
+			m_setProducts.insert(p);
+			m_iter = m_mapProducts.find(p->GetName());
+			if (m_iter == m_mapProducts.end())
+			{
+				std::list< TheProduct* > lTmp;
+				lTmp.push_back(p);
+				m_mapProducts.insert(make_pair(p->GetName(), lTmp));
+			}
+			else
+			{
+				m_iter->second.push_back(p);
+			}
+		}
+	}
+
+	void Recycling(const TheProduct* product)
 	{
 		typename std::list< TheProduct* >::iterator s_iter, s_end;
 		typename std::map< ProductName, std::list< TheProduct* > >::iterator m_iter;
@@ -102,21 +139,21 @@ public:
 		}
 		m_lBusyList.erase(s_iter);
 		product->GetProduct()->Recycling();
-		m_lIdleList.push_back(product);
+		m_lIdleList.push_back((TheProduct*)product);
 		m_iter = m_mapProducts.find(product->GetName());
 		if (m_iter == m_mapProducts.end())
 		{
 			std::list< TheProduct* > lTmp;
-			lTmp.push_back(product);
+			lTmp.push_back((TheProduct*)product);
 			m_mapProducts.insert(make_pair(product->GetName(), lTmp));
 		}
 		else
 		{
-			m_iter->second.push_back(product);
+			m_iter->second.push_back((TheProduct*)product);
 		}
 	}
 
-	void Destroy(TheProduct* product)
+	void Destroy(const TheProduct* product)
 	{
 		typename std::list< TheProduct* >::iterator s_iter;
 		typename std::map< ProductName, std::list< TheProduct* > >::iterator m_iter;
@@ -128,14 +165,14 @@ public:
 		{
 			return;
 		}
-		m_lBusyList.remove(product);
-		m_lIdleList.remove(product);
+		m_lBusyList.remove((TheProduct*)product);
+		m_lIdleList.remove((TheProduct*)product);
 		m_iter = m_mapProducts.find(product->GetName());
 		if (m_iter != m_mapProducts.end())
 		{
-			m_iter->second.remove(product);
+			m_iter->second.remove((TheProduct*)product);
 		}
-		m_setProducts.erase(product);
+		m_setProducts.erase((TheProduct*)product);
 		delete product;
 	}
 
@@ -174,10 +211,10 @@ private:
 		m_lBusyList.push_back(p);
 		return p;
 	}
-	inline bool IsValidProduct(TheProduct* p)
+	inline bool IsValidProduct(const TheProduct* p)
 	{
 		assert(p);
-		return m_setProducts.find(p) == m_setProducts.end() ? false : true;
+		return m_setProducts.find((TheProduct*)p) == m_setProducts.end() ? false : true;
 	}
 
 private:
